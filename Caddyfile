@@ -1,0 +1,30 @@
+
+# Replace with your own domain. This is an example site block for a shared
+# Caddy instance reverse-proxying to the `api` container from compose.yml
+# (published on host port 8081 there).
+your-domain.example.com {
+
+  reverse_proxy localhost:8081
+
+  # Compress responses
+  encode gzip zstd
+
+  # Security headers
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    X-Content-Type-Options    "nosniff"
+    X-Frame-Options           "DENY"
+    Referrer-Policy           "strict-origin-when-cross-origin"
+    -Server
+  }
+
+  # Access logs (caddy must have write access to this path)
+  log {
+    output file /var/log/caddy/app-access.log {
+      roll_size    10mb
+      roll_keep    5
+      roll_keep_for 720h
+    }
+    format json
+  }
+}
