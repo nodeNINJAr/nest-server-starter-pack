@@ -3,6 +3,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Auth } from '../../decorators/auth.decorator';
 import { storageConfig } from '../../config/aws/storage.config';
+import { ApiResponses } from '../../common/api-responses';
 
 @ApiTags('Upload')
 @Controller('upload')
@@ -13,11 +14,14 @@ export class UploadController {
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('file', { storage: storageConfig() }))
   upload(@UploadedFile() file: Express.Multer.File & { key: string; location: string }) {
-    return {
-      key: file.key,
-      url: file.location,
-      size: file.size,
-      mimetype: file.mimetype,
-    };
+    return ApiResponses.success(
+      {
+        key: file.key,
+        url: file.location,
+        size: file.size,
+        mimetype: file.mimetype,
+      },
+      'File uploaded successfully',
+    );
   }
 }
