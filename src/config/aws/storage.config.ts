@@ -3,10 +3,13 @@ import multerS3 from 'multer-s3';
 import { s3Client } from './s3.client';
 
 export const storageConfig = (folder = 'uploads') => {
-  //
+  if (!process.env.AWS_S3_BUCKET) {
+    throw new Error('AWS_S3_BUCKET environment variable is not defined');
+  }
+
   return multerS3({
     s3: s3Client,
-    bucket: process.env.AWS_S3_BUCKET!,
+    bucket: process.env.AWS_S3_BUCKET,
     // acl: 'public-read', // change to 'private' if needed
     contentType: multerS3.AUTO_CONTENT_TYPE,
     key: (req, file, cb) => {
