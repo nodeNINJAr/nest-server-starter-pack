@@ -1,6 +1,6 @@
-import { Body, Controller, Get, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthService, SessionMeta } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -9,9 +9,11 @@ import { Public } from '../../decorators/public.decorator';
 import { Auth } from '../../decorators/auth.decorator';
 import { CurrentUser } from '../../decorators/currentuser.decorator';
 import { ApiResponses } from '../../common/api-responses';
+import { JwtAuthGuard } from '../../guards/jwt.guard';
 
 @ApiTags('Auth')
 @Controller('auth')
+@UseGuards(JwtAuthGuard)
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
@@ -48,6 +50,7 @@ export class AuthController {
   }
 
   @Auth()
+  @ApiBearerAuth()
   @Get('me')
   @ApiOperation({ summary: 'Get the currently authenticated user' })
   me(@CurrentUser() user: unknown) {
