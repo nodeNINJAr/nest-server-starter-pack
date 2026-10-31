@@ -1,24 +1,24 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req } from '@nestjs/common';
 import type { Request } from 'express';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthService, SessionMeta } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
-import { Public } from '../../decorators/public.decorator';
-import { Auth } from '../../decorators/auth.decorator';
-import { CurrentUser } from '../../decorators/currentuser.decorator';
-import { ApiResponses } from '../../common/api-responses';
-import { JwtAuthGuard } from '../../guards/jwt.guard';
+import { Public } from '../../core/security/decorators/public.decorator';
+import { Auth } from '../../core/security/decorators/auth.decorator';
+import { CurrentUser } from '../../core/security/decorators/currentuser.decorator';
+import { ApiResponses } from '../../common/http/api-responses';
+import { RateLimit } from '../../core/security/decorators/rate-limit.decorator';
 
 @ApiTags('Auth')
 @Controller('auth')
-@UseGuards(JwtAuthGuard)
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Public()
   @Post('register')
+  @RateLimit(5)
   @ApiOperation({ summary: 'Create a new account' })
   async register(@Body() dto: RegisterDto, @Req() req: Request) {
     const result = await this.authService.register(dto, this.meta(req));
@@ -27,6 +27,7 @@ export class AuthController {
 
   @Public()
   @Post('login')
+  @RateLimit(10)
   @ApiOperation({ summary: 'Log in with username/email + password' })
   async login(@Body() dto: LoginDto, @Req() req: Request) {
     const result = await this.authService.login(dto, this.meta(req));
@@ -35,7 +36,10 @@ export class AuthController {
 
   @Public()
   @Post('refresh')
-  @ApiOperation({ summary: 'Exchange a refresh token for a new access + refresh token pair' })
+  @RateLimit(30)
+  @ApiOperation({
+    summary: 'Exchange a refresh token for a new access + refresh token pair',
+  })
   async refresh(@Body() dto: RefreshDto, @Req() req: Request) {
     const result = await this.authService.refresh(dto.refreshToken, this.meta(req));
     return ApiResponses.success(result, 'Token refreshed successfully');
@@ -43,6 +47,7 @@ export class AuthController {
 
   @Public()
   @Post('logout')
+  @RateLimit(30)
   @ApiOperation({ summary: 'Revoke a refresh token (ends that session)' })
   async logout(@Body() dto: RefreshDto) {
     await this.authService.logout(dto.refreshToken);

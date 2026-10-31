@@ -1,23 +1,20 @@
 import {
+  BadRequestException,
   Controller,
   Post,
   UploadedFile,
   UploadedFiles,
-  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Auth } from '../../decorators/auth.decorator';
-import { storageConfig } from '../../config/aws/storage.config';
-import { ApiResponses } from '../../common/api-responses';
-import { JwtAuthGuard } from '../../guards/jwt.guard';
+import { Auth } from '../../core/security/decorators/auth.decorator';
+import { ApiResponses } from '../../common/http/api-responses';
 
 const MAX_FILES = 10;
 
 @ApiTags('Upload')
 @Controller('upload')
-@UseGuards(JwtAuthGuard)
 export class UploadController {
   @Auth()
   @ApiBearerAuth()
@@ -30,8 +27,9 @@ export class UploadController {
       properties: { file: { type: 'string', format: 'binary' } },
     },
   })
-  @UseInterceptors(FileInterceptor('file', { storage: storageConfig() }))
+  @UseInterceptors(FileInterceptor('file'))
   upload(@UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('A file is required');
     return ApiResponses.success(this.toResult(file), 'File uploaded successfully');
   }
 
@@ -48,8 +46,9 @@ export class UploadController {
       },
     },
   })
-  @UseInterceptors(FilesInterceptor('files', MAX_FILES, { storage: storageConfig() }))
+  @UseInterceptors(FilesInterceptor('files', MAX_FILES))
   uploadMultiple(@UploadedFiles() files: Express.Multer.File[]) {
+    if (!files?.length) throw new BadRequestException('At least one file is required');
     return ApiResponses.success(
       files.map((file) => this.toResult(file)),
       'Files uploaded successfully',

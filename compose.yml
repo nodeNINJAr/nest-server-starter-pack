@@ -1,90 +1,88 @@
+x-runtime: &runtime
+  image: ${DOCKER_IMAGE:-universal-backend:local}
+  build:
+    context: .
+    target: runtime
+  restart: unless-stopped
+  env_file: .env
+  environment: &runtime-env
+    NODE_ENV: production
+    PORT: 8000
+    HOST: 0.0.0.0
+    DATABASE_URL: postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@postgres:5432/${DATABASE_NAME}?schema=public
+    REDIS_HOST: redis
+    REDIS_PORT: 6379
+    TRUST_PROXY_HOPS: 1
+    SWAGGER_ENABLED: "false"
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  networks: [backend]
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
 services:
   postgres:
     image: postgres:17-alpine
-    container_name: app_postgres
     restart: unless-stopped
-    env_file: .env
     environment:
-      POSTGRES_USER:     ${DATABASE_USER}
+      POSTGRES_USER: ${DATABASE_USER}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
-      POSTGRES_DB:       ${DATABASE_NAME}
-      # Recommended tuning for small VPS (1-2 GB RAM)
-      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --auth-local=scram-sha-256"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - backend
+      POSTGRES_DB: ${DATABASE_NAME}
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    networks: [backend]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER} -d ${DATABASE_NAME}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-
-  redis:
-    image: redis:7
-    container_name: app_redis
-    restart: always
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      test: ["CMD-SHELL", 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
       interval: 5s
       timeout: 3s
-      retries: 5
-    networks:
-      - backend
+      retries: 10
 
-  api:
-    image: ${DOCKER_IMAGE}
-    container_name: app_api
+  redis:
+    image: redis:7-alpine
     restart: unless-stopped
-    env_file: .env
     environment:
-      NODE_ENV:     production
-      PORT:         80
-      DATABASE_URL: postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@app_postgres:5432/${DATABASE_NAME}?schema=public&sslmode=disable
-    ports:
-      - "8081:80"
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD}
+    command: ["sh", "-c", 'exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"']
+    volumes: [redis_data:/data]
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", 'REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -q PONG']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    image: ${DOCKER_IMAGE:-universal-backend:local}-tools
+    build:
+      context: .
+      target: tools
+    profiles: [tools]
+    env_file: .env
+    environment: *runtime-env
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - backend
-    healthcheck:
-      interval: 15s
-      timeout: 5s
-      start_period: 30s
-      retries: 3
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-        reservations:
-          memory: 128M
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
+    networks: [backend]
+    command: ["pnpm", "db:deploy"]
 
-  # ℹ️  Caddy is NOT included here — if you run a shared Caddy instance on the
-  #    host (e.g. serving multiple apps on one VPS), it handles TLS and
-  #    reverse proxying. See Caddyfile for the site block to add to it.
+  api:
+    <<: *runtime
+    # Only the host reverse proxy can reach this published port.
+    ports: ["127.0.0.1:8081:8000"]
+
+  worker:
+    <<: *runtime
+    command: ["node", "dist/src/worker.js"]
+    healthcheck:
+      disable: true
 
 volumes:
   postgres_data:
-    driver: local
   redis_data:
-    driver: local
-  # caddy volumes removed — using shared Caddy on host
-
 networks:
   backend:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.20.0.0/16

@@ -1,46 +1,31 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { JwtModule } from '@nestjs/jwt';
-import { BullModule } from '@nestjs/bullmq';
-import { ScheduleModule } from '@nestjs/schedule';
-import { AppController } from './app.controller.js';
-import { AppService } from './app.service.js';
-import { HealthModule } from './health/health.module.js';
-import { DatabaseModule } from './config/datasource/database.module';
-import { RedisModule } from './config/redis/redis.module.js';
-import { CommonModule } from './common/common-module';
-import { QueueModule } from './queue/queue-module';
+import { APP_FILTER } from '@nestjs/core';
+import { AppConfigModule } from './core/config/app-config.module';
+import { SecurityModule } from './core/security/security.module';
+import { DatabaseModule } from './infrastructure/database/database.module';
+import { RedisModule } from './infrastructure/redis/redis.module';
+import { QueueModule } from './infrastructure/queue/queue.module';
+import { GlobalExceptionFilter } from './common/http/filters/http-exception.filter';
 import { AuthModule } from './modules/auth/auth.module';
 import { UploadModule } from './modules/upload/upload.module';
+import { HealthModule } from './modules/health/health.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-      envFilePath: ['.env', '.env.development.local'],
-    }),
-    JwtModule.register({
-      global: true,
-      secret: process.env.JWT_SECRET || 'changeme',
-      signOptions: { expiresIn: '7d' },
-    }),
-    BullModule.forRoot({
-      connection: {
-        host: process.env.REDIS_HOST || 'localhost',
-        port: parseInt(process.env.REDIS_PORT as string) || 6379,
-        password: process.env.REDIS_PASSWORD,
-      },
-    }),
-    ScheduleModule.forRoot(),
+    AppConfigModule,
     DatabaseModule,
-    HealthModule,
     RedisModule,
-    CommonModule,
     QueueModule,
+    SecurityModule,
     AuthModule,
     UploadModule,
+    HealthModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, { provide: APP_FILTER, useClass: GlobalExceptionFilter }],
 })
 export class AppModule {}

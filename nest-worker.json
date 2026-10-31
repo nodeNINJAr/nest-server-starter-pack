@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/nest-cli",
+  "collection": "@nestjs/schematics",
+  "sourceRoot": "src",
+  "entryFile": "worker",
+  "compilerOptions": {
+    "deleteOutDir": true,
+    "tsConfigPath": "tsconfig.worker.json",
+    "assets": [
+      {
+        "include": "infrastructure/messaging/mail/templates/**/*.hbs",
+        "outDir": "dist-worker/src",
+        "watchAssets": true
+      }
+    ]
+  }
+}
