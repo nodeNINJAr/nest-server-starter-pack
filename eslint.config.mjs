@@ -3,39 +3,26 @@ import tseslint from 'typescript-eslint';
 import prettier from 'eslint-plugin-prettier';
 import globals from 'globals';
 
-export default [
+export default tseslint.config(
+  {
+    ignores: ['dist/**', 'dist-worker/**', 'node_modules/**', 'prisma/generated/**', 'coverage/**'],
+  },
   js.configs.recommended,
-
-  ...tseslint.configs.recommendedTypeChecked,
-
+  ...tseslint.configs.recommended,
   {
     files: ['**/*.ts'],
-    languageOptions: {
-      parser: tseslint.parser,
-      parserOptions: {
-        project: './tsconfig.json',
-        tsconfigRootDir: import.meta.dirname,
-      },
-      globals: {
-        ...globals.node,
-        ...globals.jest,
-      },
-    },
-
-    plugins: {
-      '@typescript-eslint': tseslint.plugin,
-      prettier,
-    },
-
+    languageOptions: { globals: { ...globals.node, ...globals.jest } },
+    plugins: { prettier },
     rules: {
-      '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/no-floating-promises': 'warn',
-      '@typescript-eslint/no-unsafe-argument': 'warn',
-
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
       'prettier/prettier': [
         'error',
         {
-          endOfLine: 'auto',
+          endOfLine: 'lf',
           singleQuote: true,
           trailingComma: 'all',
           printWidth: 100,
@@ -45,8 +32,4 @@ export default [
       ],
     },
   },
-
-  {
-    ignores: ['dist/**', 'node_modules/**'],
-  },
-];
+);

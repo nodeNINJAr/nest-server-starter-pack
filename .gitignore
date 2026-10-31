@@ -4,6 +4,7 @@ coverage/
 uploads/
 
 .env
+.env.local
 .env.*.local
 
 *.tsbuildinfo
@@ -11,3 +12,5 @@ prisma/generated/
 
 *.log
 .DS_Store
+
+dist-worker/

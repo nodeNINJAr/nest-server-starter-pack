@@ -1,58 +1,56 @@
+x-dev: &dev
+  build:
+    context: .
+    dockerfile: Dockerfile.dev
+  env_file: .env
+  environment:
+    DATABASE_URL: postgresql://${DATABASE_USER}:${DATABASE_PASSWORD}@db:5432/${DATABASE_NAME}?schema=public
+    REDIS_HOST: redis
+    REDIS_PORT: 6379
+  volumes:
+    - .:/app
+    - app_node_modules:/app/node_modules
+  depends_on:
+    db:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
 services:
   db:
-    image: postgres:16
-    container_name: app_db
-    restart: always
+    image: postgres:17-alpine
     environment:
-      POSTGRES_USER: ${DATABASE_USER}
-      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
-      POSTGRES_DB: ${DATABASE_NAME}
-    ports:
-      - "5434:5432"
-    volumes:
-      - db_data:/var/lib/postgresql/data
+      POSTGRES_USER: ${DATABASE_USER:-postgres}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-postgres}
+      POSTGRES_DB: ${DATABASE_NAME:-app}
+    ports: ["127.0.0.1:5434:5432"]
+    volumes: [db_data:/var/lib/postgresql/data]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-  redis:
-    image: redis:7
-    container_name: app_redis
-    restart: always
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
-    ports:
-      - "6389:6379"
-    volumes:
-      - redis_data:/data
-    environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
-    healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a $$REDIS_PASSWORD ping | grep PONG"]
+      test: ["CMD-SHELL", 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
       interval: 5s
       timeout: 3s
-      retries: 5
-
+      retries: 10
+  redis:
+    image: redis:7-alpine
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD}
+    command: ["sh", "-c", 'exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"']
+    ports: ["127.0.0.1:6389:6379"]
+    volumes: [redis_data:/data]
+    healthcheck:
+      test: ["CMD-SHELL", 'REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -q PONG']
+      interval: 5s
+      timeout: 3s
+      retries: 10
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile.dev
-    container_name: app_api
-    restart: always
-    ports:
-      - "8000:8000"
-    env_file:
-      - .env
-    volumes:
-      - .:/app:cached
-      - /app/node_modules
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+    <<: *dev
+    ports: ["127.0.0.1:8000:8000"]
+  worker:
+    <<: *dev
+    # Generate the shared client before starting both processes (scripts/start.sh).
+    command: ["pnpm", "start:worker:dev"]
 
 volumes:
   db_data:
   redis_data:
+  app_node_modules:

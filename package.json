@@ -1,18 +1,18 @@
 {
-  "name": "nestjs-starter-pack",
+  "name": "Saas-erp-backend",
   "version": "0.0.1",
-  "description": "Production-ready NestJS starter pack: Prisma + Postgres, Redis, BullMQ queues (email/SMS/push), JWT auth with role guards, S3 uploads, Docker deploy.",
+  "description": "Universal NestJS backend starter with Prisma, PostgreSQL, Redis, authentication, optional storage and messaging, and separate workers.",
   "author": "",
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
     "build": "nest build",
-    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "format": "prettier --write \"{src,test,prisma,scripts}/**/*.{ts,hbs}\" \"*.{json,mjs,yml,yaml}\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
-    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "start:prod": "node dist/src/main.js",
+    "lint": "eslint \"{src,test,prisma,scripts}/**/*.ts\"",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
@@ -20,9 +20,16 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "docker:start": "bash ./scripts/start.sh",
     "docker:stop": "docker compose -f docker-compose.dev.yml down",
-    "docker:prisma_fix_migrate": "docker compose -f docker-compose.dev.yml exec app npx prisma migrate resolve --applied 'migration_file'",
-    "docker:prisma_reset": "docker compose -f docker-compose.dev.yml exec app npx prisma migrate reset --force",
-    "docker:prisma_migrate": "docker compose -f docker-compose.dev.yml exec app npx prisma migrate dev"
+    "start:worker": "node dist/src/worker.js",
+    "start:worker:dev": "nest start --config nest-worker.json --watch",
+    "lint:fix": "pnpm lint --fix",
+    "typecheck": "tsc --noEmit --incremental false",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:seed": "prisma db seed",
+    "db:admin": "tsx scripts/create-admin.ts",
+    "check": "pnpm typecheck && pnpm lint && pnpm test --runInBand && pnpm test:e2e --runInBand && pnpm build"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1053.0",
@@ -99,12 +106,21 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "**/*.ts",
+      "!**/*.module.ts",
+      "!main.ts",
+      "!worker.ts",
+      "!types/**"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "moduleNameMapper": {
+      "^(\\.{1,2}/.*)\\.js$": "$1"
+    }
   },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
-  }
+  "engines": {
+    "node": ">=22.12",
+    "pnpm": ">=10 <11"
+  },
+  "packageManager": "pnpm@10.34.9"
 }
